@@ -9,14 +9,15 @@ public extension OpalDiagnostics {
             self.category = category
         }
 
+        /// Records a stable event name with optional trace and privacy-marked fields.
         public func record(
-            _ message: String,
+            event: Event,
             level: Level = .notice,
             traceID: TraceID? = nil,
             fields: [Field] = []
         ) {
             OpalDiagnosticsRuntime.shared.record(
-                message,
+                event: event,
                 category: category,
                 level: level,
                 traceID: traceID,

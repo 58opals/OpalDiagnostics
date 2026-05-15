@@ -9,7 +9,7 @@ public extension OpalDiagnostics {
         public let timestamp: Date
         public let category: Category
         public let level: Level
-        public let message: String
+        public let event: Event
         public let traceID: TraceID?
         public let fields: [Field]
 
@@ -18,7 +18,7 @@ public extension OpalDiagnostics {
             timestamp: Date = Date(),
             category: Category,
             level: Level,
-            message: String,
+            event: Event,
             traceID: TraceID?,
             fields: [Field]
         ) {
@@ -26,7 +26,7 @@ public extension OpalDiagnostics {
             self.timestamp = timestamp
             self.category = category
             self.level = level
-            self.message = message
+            self.event = event
             self.traceID = traceID
             self.fields = fields.map(\.redactedForStorage)
         }
@@ -35,7 +35,7 @@ public extension OpalDiagnostics {
 
 extension OpalDiagnostics.Record {
     var formattedMessage: String {
-        var components = [message]
+        var components = ["event=\(event.rawValue)"]
 
         if let traceID {
             components.append("trace_id=\(traceID.rawValue)")

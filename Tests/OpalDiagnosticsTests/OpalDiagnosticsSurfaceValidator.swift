@@ -9,6 +9,7 @@ struct OpalDiagnosticsSurfaceValidator {
     func validatePublicFacadeIsAvailableToPackageClients() {
         _ = OpalDiagnostics.self
         _ = OpalDiagnostics.logger(category: .diagnostics)
+        _ = OpalDiagnostics.Event(rawValue: "diagnostics.started")
 
         let categories: [OpalDiagnostics.Category] = [
             .diagnostics,
@@ -45,7 +46,7 @@ struct OpalDiagnosticsSurfaceValidator {
         #expect(configuration.categoryFilter == .all)
         #expect(configuration.bufferPolicy == .disabled)
 
-        OpalDiagnostics.logger(category: .diagnostics).record("default event", level: .notice)
+        OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.default", level: .notice)
 
         #expect(OpalDiagnostics.recentRecords.isEmpty)
     }
@@ -58,10 +59,10 @@ struct OpalDiagnosticsSurfaceValidator {
         OpalDiagnostics.configure(.init(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10)))
 
         let logger = OpalDiagnostics.logger(category: .diagnostics)
-        logger.record("debug event", level: .debug)
-        logger.record("notice event", level: .notice)
+        logger.record(event: "diagnostics.debug", level: .debug)
+        logger.record(event: "diagnostics.notice", level: .notice)
 
-        #expect(OpalDiagnostics.recentRecords.map(\.message) == ["notice event"])
+        #expect(OpalDiagnostics.recentRecords.map(\.event.rawValue) == ["diagnostics.notice"])
     }
 
     @Test("category filter includes and excludes records")
@@ -70,14 +71,14 @@ struct OpalDiagnosticsSurfaceValidator {
         defer { resetDiagnostics() }
 
         OpalDiagnostics.configure(.init(minimumLevel: .debug, categoryFilter: .enabled([.crypto]), bufferPolicy: .enabled(capacity: 10)))
-        OpalDiagnostics.logger(category: .crypto).record("crypto event", level: .debug)
-        OpalDiagnostics.logger(category: .base).record("base event", level: .debug)
+        OpalDiagnostics.logger(category: .crypto).record(event: "crypto.verified", level: .debug)
+        OpalDiagnostics.logger(category: .base).record(event: "base.loaded", level: .debug)
 
         #expect(OpalDiagnostics.recentRecords.map(\.category) == [.crypto])
 
         OpalDiagnostics.configure(.init(minimumLevel: .debug, categoryFilter: .excluded([.security]), bufferPolicy: .enabled(capacity: 10)))
-        OpalDiagnostics.logger(category: .security).record("security event", level: .debug)
-        OpalDiagnostics.logger(category: .fusion).record("fusion event", level: .debug)
+        OpalDiagnostics.logger(category: .security).record(event: "security.filtered", level: .debug)
+        OpalDiagnostics.logger(category: .fusion).record(event: "fusion.loaded", level: .debug)
 
         #expect(OpalDiagnostics.recentRecords.map(\.category) == [.fusion])
     }
@@ -91,7 +92,7 @@ struct OpalDiagnosticsSurfaceValidator {
         let generatedTraceID = OpalDiagnostics.TraceID()
         OpalDiagnostics.configure(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10)))
 
-        OpalDiagnostics.logger(category: .hedge).record("hedge event", level: .debug, traceID: traceID)
+        OpalDiagnostics.logger(category: .hedge).record(event: "hedge.quoted", level: .debug, traceID: traceID)
 
         #expect(generatedTraceID.rawValue.isEmpty == false)
         #expect(OpalDiagnostics.recentRecords.first?.traceID == traceID)
@@ -105,7 +106,7 @@ struct OpalDiagnosticsSurfaceValidator {
         OpalDiagnostics.configure(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10)))
 
         OpalDiagnostics.logger(category: .fulcrum).record(
-            "fulcrum event",
+            event: "fulcrum.connected",
             level: .debug,
             fields: [
                 .init(name: "node", value: "testnet", privacy: .public),
@@ -126,11 +127,11 @@ struct OpalDiagnosticsSurfaceValidator {
         OpalDiagnostics.configure(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 2)))
 
         let logger = OpalDiagnostics.logger(category: .diagnostics)
-        logger.record("first", level: .debug)
-        logger.record("second", level: .debug)
-        logger.record("third", level: .debug)
+        logger.record(event: "diagnostics.first", level: .debug)
+        logger.record(event: "diagnostics.second", level: .debug)
+        logger.record(event: "diagnostics.third", level: .debug)
 
-        #expect(OpalDiagnostics.recentRecords.map(\.message) == ["second", "third"])
+        #expect(OpalDiagnostics.recentRecords.map(\.event.rawValue) == ["diagnostics.second", "diagnostics.third"])
     }
 
     @Test("recent records can be cleared")
@@ -139,13 +140,36 @@ struct OpalDiagnosticsSurfaceValidator {
         defer { resetDiagnostics() }
 
         OpalDiagnostics.configure(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10)))
-        OpalDiagnostics.logger(category: .diagnostics).record("event", level: .debug)
+        OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.clearable", level: .debug)
 
         #expect(OpalDiagnostics.recentRecords.isEmpty == false)
 
         OpalDiagnostics.clearRecentRecords()
 
         #expect(OpalDiagnostics.recentRecords.isEmpty)
+    }
+
+    @Test("stable event names keep dynamic values in fields")
+    func validateStableEventNamesKeepDynamicValuesInFields() {
+        resetDiagnostics()
+        defer { resetDiagnostics() }
+
+        let event = OpalDiagnostics.Event(rawValue: "wallet.action.started")
+        OpalDiagnostics.configure(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10)))
+
+        OpalDiagnostics.logger(category: .diagnostics).record(
+            event: event,
+            level: .debug,
+            fields: [
+                .init(name: "wallet_id", value: "wallet-123", privacy: .private),
+                .init(name: "action", value: "sync", privacy: .public)
+            ]
+        )
+
+        let record = OpalDiagnostics.recentRecords.first
+        #expect(record?.event == event)
+        #expect(record?.fields.map(\.name) == ["wallet_id", "action"])
+        #expect(record?.fields.map(\.value) == ["<redacted>", "sync"])
     }
 
     private func resetDiagnostics() {

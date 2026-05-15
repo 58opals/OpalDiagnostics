@@ -36,7 +36,7 @@ final class OpalDiagnosticsRuntime: @unchecked Sendable {
     }
 
     func record(
-        _ message: String,
+        event: OpalDiagnostics.Event,
         category: OpalDiagnostics.Category,
         level: OpalDiagnostics.Level,
         traceID: OpalDiagnostics.TraceID?,
@@ -56,7 +56,7 @@ final class OpalDiagnosticsRuntime: @unchecked Sendable {
         record = OpalDiagnostics.Record(
             category: category,
             level: level,
-            message: message,
+            event: event,
             traceID: traceID,
             fields: fields
         )

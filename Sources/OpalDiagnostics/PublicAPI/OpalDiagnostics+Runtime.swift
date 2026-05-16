@@ -20,4 +20,20 @@ public extension OpalDiagnostics {
     static func clearRecentRecords() {
         OpalDiagnosticsRuntime.shared.clearRecentRecords()
     }
+
+    /// Runs an operation with diagnostics settings scoped to the current task and inherited child tasks.
+    static func withConfiguration<Success>(
+        _ configuration: Configuration,
+        operation: () throws -> Success
+    ) rethrows -> Success {
+        try OpalDiagnosticsRuntime.shared.withConfiguration(configuration, operation: operation)
+    }
+
+    /// Runs an async operation with diagnostics settings scoped to the current task and inherited child tasks.
+    static func withConfiguration<Success>(
+        _ configuration: Configuration,
+        operation: () async throws -> Success
+    ) async rethrows -> Success {
+        try await OpalDiagnosticsRuntime.shared.withConfiguration(configuration, operation: operation)
+    }
 }

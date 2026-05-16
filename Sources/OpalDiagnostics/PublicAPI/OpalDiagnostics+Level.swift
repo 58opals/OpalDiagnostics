@@ -4,6 +4,8 @@ import OSLog
 
 public extension OpalDiagnostics {
     /// A diagnostic severity level with threshold ordering.
+    ///
+    /// There is no separate warning level. Use `.notice` for noteworthy recoverable states and `.error` when an operation failed.
     enum Level: String, CaseIterable, Comparable, Sendable {
         case debug
         case info

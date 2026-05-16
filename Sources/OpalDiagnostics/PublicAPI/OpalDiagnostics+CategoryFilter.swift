@@ -5,7 +5,11 @@ public extension OpalDiagnostics {
     enum CategoryFilter: Equatable, Sendable {
         case all
         case enabled(Set<Category>)
+        /// Enables exact categories and their dotted subcategories.
+        case enabledIncludingSubcategories(Set<Category>)
         case excluded(Set<Category>)
+        /// Excludes exact categories and their dotted subcategories.
+        case excludedIncludingSubcategories(Set<Category>)
     }
 }
 
@@ -16,8 +20,18 @@ extension OpalDiagnostics.CategoryFilter {
             true
         case let .enabled(categories):
             categories.contains(category)
+        case let .enabledIncludingSubcategories(categories):
+            categories.contains { category.isEqualToOrSubcategory(of: $0) }
         case let .excluded(categories):
             !categories.contains(category)
+        case let .excludedIncludingSubcategories(categories):
+            !categories.contains { category.isEqualToOrSubcategory(of: $0) }
         }
+    }
+}
+
+private extension OpalDiagnostics.Category {
+    func isEqualToOrSubcategory(of category: Self) -> Bool {
+        rawValue == category.rawValue || (category.rawValue.isEmpty == false && rawValue.hasPrefix("\(category.rawValue)."))
     }
 }

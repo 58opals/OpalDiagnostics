@@ -35,16 +35,43 @@ public extension OpalDiagnostics {
 
 extension OpalDiagnostics.Record {
     var formattedMessage: String {
-        var components = ["event=\(event.rawValue)"]
+        var components = ["event=\(Self.formatMessageValue(event.rawValue))"]
 
         if let traceID {
-            components.append("trace_id=\(traceID.rawValue)")
+            components.append("trace_id=\(Self.formatMessageValue(traceID.rawValue))")
         }
 
         if fields.isEmpty == false {
-            components.append(fields.map { "\($0.name)=\($0.value)" }.joined(separator: " "))
+            components.append(fields.map { "\($0.name)=\(Self.formatMessageValue($0.value))" }.joined(separator: " "))
         }
 
         return components.joined(separator: " ")
+    }
+
+    private static func formatMessageValue(_ value: String) -> String {
+        guard value.isEmpty || value.contains(where: \.isWhitespace) || value.contains("\"") || value.contains("\\") else {
+            return value
+        }
+
+        var escapedValue = ""
+
+        for character in value {
+            switch character {
+            case "\\":
+                escapedValue += "\\\\"
+            case "\"":
+                escapedValue += "\\\""
+            case "\n":
+                escapedValue += "\\n"
+            case "\r":
+                escapedValue += "\\r"
+            case "\t":
+                escapedValue += "\\t"
+            default:
+                escapedValue.append(character)
+            }
+        }
+
+        return "\"\(escapedValue)\""
     }
 }

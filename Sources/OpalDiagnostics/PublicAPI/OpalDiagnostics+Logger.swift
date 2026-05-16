@@ -20,7 +20,7 @@ public extension OpalDiagnostics {
                 event: event,
                 category: category,
                 level: level,
-                traceID: traceID,
+                traceID: traceID ?? OpalDiagnostics.currentTraceID,
                 fields: fields
             )
         }

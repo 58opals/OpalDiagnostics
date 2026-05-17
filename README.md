@@ -11,7 +11,7 @@ Out of scope for this package are app-specific UI and Wallet execution notes.
 ## Package Surfaces
 
 - `OpalDiagnostics`: library target and public facade namespace.
-- `OpalDiagnostics.Event`, `Category`, `Level`, `TraceID`, `Field`, and `FieldPrivacy`: public-safe diagnostic event primitives.
+- `OpalDiagnostics.Event`, `Category`, `ErrorCode`, `Level`, `TraceID`, `Field`, and `FieldPrivacy`: public-safe diagnostic event primitives.
 - `OpalDiagnostics.Configuration`, `CategoryFilter`, `BufferPolicy`, and `RoutingPolicy`: runtime controls for host applications.
 - `OpalDiagnostics.Logger`: category-bound event emitter that is silent until the host application enables OSLog routing and/or buffering.
 - `OpalDiagnostics.recentRecords`: disabled-by-default in-memory export surface for recent sanitized diagnostics.
@@ -31,6 +31,8 @@ Exact category filters preserve exact matching with `.enabled(_:)` and `.exclude
 Event names must be static, non-sensitive, and low-cardinality. Do not embed wallet data, user data, secrets, network responses, addresses, transaction details, or other runtime values in an event name. Pass all dynamic values through `OpalDiagnostics.Field` with explicit `FieldPrivacy` so private values are redacted before enabled OSLog routing or recent-record export.
 
 `OpalDiagnostics.Field` stores values as strings and provides public-safe convenience initializers for `Int`, `UInt64`, `Bool`, `UUID`, `Duration`, byte counts, and explicit public strings. Keep private or sensitive runtime strings on `init(name:value:privacy:)` with `.private`.
+
+Use `OpalDiagnostics.ErrorCode` for stable, package-owned error identifiers that should be emitted as diagnostics fields without introducing package-local diagnostics error-code types. `OpalDiagnostics.Field.errorCode(_:)` writes public `error_code`, `errorType(_:)` writes public `error_type`, and `errorMessage(_:)` writes private `error_message` so messages are redacted before routing or recent-record export.
 
 ## Levels
 

@@ -119,12 +119,15 @@ struct OpalDiagnosticsRoutingValidator {
             fields: [
                 .init(name: "message", publicValue: "hello world"),
                 .init(name: "quote", publicValue: "a \"b\""),
+                .init(name: "crlf", publicValue: "a\r\nb"),
                 .init(name: "line", publicValue: "a\nb"),
+                .init(name: "line_separator", publicValue: "a\u{2028}b"),
+                .init(name: "paragraph_separator", publicValue: "a\u{2029}b"),
                 .init(name: "empty", publicValue: "")
             ]
         )
 
-        #expect(record.formattedMessage == #"event=diagnostics.message trace_id="trace 1" message="hello world" quote="a \"b\"" line="a\nb" empty="""#)
+        #expect(record.formattedMessage == #"event=diagnostics.message trace_id="trace 1" message="hello world" quote="a \"b\"" crlf="a\r\nb" line="a\nb" line_separator="a\u{2028}b" paragraph_separator="a\u{2029}b" empty="""#)
     }
 
     @Test("formatted messages quote field names that would break key-value output")
@@ -141,22 +144,5 @@ struct OpalDiagnosticsRoutingValidator {
         )
 
         #expect(record.formattedMessage == #"event=diagnostics.message "bad name"=space "bad=key"=equals"#)
-    }
-}
-
-private final class RecordingDiagnosticRecordRouter: @unchecked Sendable, DiagnosticRecordRouting {
-    private let lock = NSLock()
-    private var routedRecords: [(record: OpalDiagnostics.Record, subsystem: String)] = []
-
-    var routes: [(record: OpalDiagnostics.Record, subsystem: String)] {
-        lock.lock()
-        defer { lock.unlock() }
-        return routedRecords
-    }
-
-    func route(_ record: OpalDiagnostics.Record, subsystem: String) {
-        lock.lock()
-        routedRecords.append((record, subsystem))
-        lock.unlock()
     }
 }

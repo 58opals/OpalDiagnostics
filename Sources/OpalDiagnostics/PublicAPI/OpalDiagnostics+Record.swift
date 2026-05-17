@@ -41,9 +41,7 @@ extension OpalDiagnostics.Record {
             components.append("trace_id=\(Self.formatMessageValue(traceID.rawValue))")
         }
 
-        if fields.isEmpty == false {
-            components.append(fields.map { "\(Self.formatMessageKey($0.name))=\(Self.formatMessageValue($0.value))" }.joined(separator: " "))
-        }
+        components += fields.map { "\(Self.formatMessageKey($0.name))=\(Self.formatMessageValue($0.value))" }
 
         return components.joined(separator: " ")
     }
@@ -77,12 +75,18 @@ extension OpalDiagnostics.Record {
                 escapedValue += "\\\\"
             case "\"":
                 escapedValue += "\\\""
+            case "\r\n":
+                escapedValue += "\\r\\n"
             case "\n":
                 escapedValue += "\\n"
             case "\r":
                 escapedValue += "\\r"
             case "\t":
                 escapedValue += "\\t"
+            case "\u{2028}":
+                escapedValue += "\\u{2028}"
+            case "\u{2029}":
+                escapedValue += "\\u{2029}"
             default:
                 escapedValue.append(character)
             }

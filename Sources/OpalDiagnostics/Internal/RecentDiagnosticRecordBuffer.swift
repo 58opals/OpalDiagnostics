@@ -17,12 +17,11 @@ struct RecentDiagnosticRecordBuffer {
             return
         }
 
-        storedRecords.append(record)
-
-        let overflowCount = storedRecords.count - capacity
-        if overflowCount > 0 {
-            storedRecords.removeFirst(overflowCount)
+        if storedRecords.count == capacity {
+            storedRecords.removeFirst()
         }
+
+        storedRecords.append(record)
     }
 
     mutating func clear() {

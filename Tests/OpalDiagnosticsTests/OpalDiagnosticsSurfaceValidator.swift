@@ -11,6 +11,7 @@ struct OpalDiagnosticsSurfaceValidator {
         _ = OpalDiagnostics.self
         _ = OpalDiagnostics.logger(category: .diagnostics)
         _ = OpalDiagnostics.Event(rawValue: "diagnostics.started")
+        _ = OpalDiagnostics.ErrorCode(rawValue: "diagnostics.failed")
         _ = OpalDiagnostics.RecordQuery(category: .diagnostics)
         _ = OpalDiagnostics.RoutingPolicy.disabled
         _ = OpalDiagnostics.currentTraceID
@@ -157,6 +158,72 @@ struct OpalDiagnosticsSurfaceValidator {
 
         #expect(fields.map(\.value) == ["connected", "3", "840000", "true", uuid.uuidString, "2s", "2048"])
         #expect(fields.allSatisfy { $0.privacy == .public })
+    }
+
+    @Test("error code follows category and event raw value behavior")
+    func validateErrorCodeFollowsCategoryAndEventRawValueBehavior() {
+        let rawValue = "diagnostics.operation_failed"
+        let category: OpalDiagnostics.Category = "diagnostics.operation_failed"
+        let event: OpalDiagnostics.Event = "diagnostics.operation_failed"
+        let errorCode: OpalDiagnostics.ErrorCode = "diagnostics.operation_failed"
+
+        #expect(errorCode == OpalDiagnostics.ErrorCode(rawValue: rawValue))
+        #expect(errorCode.rawValue == rawValue)
+        #expect(errorCode.description == rawValue)
+        #expect(errorCode.rawValue == category.rawValue)
+        #expect(errorCode.description == event.description)
+    }
+
+    @Test("error fields use stable public and private privacy defaults")
+    func validateErrorFieldsUseStablePublicAndPrivatePrivacyDefaults() {
+        let error: Swift.Error = URLError(.badServerResponse)
+
+        let fields: [OpalDiagnostics.Field] = [
+            .errorCode(OpalDiagnostics.ErrorCode(rawValue: "diagnostics.operation_failed")),
+            .errorCode("diagnostics.raw_operation_failed"),
+            .errorType(error),
+            .errorMessage("private failure reason")
+        ]
+
+        #expect(fields.map(\.name) == ["error_code", "error_code", "error_type", "error_message"])
+        #expect(fields.map(\.value) == ["diagnostics.operation_failed", "diagnostics.raw_operation_failed", String(reflecting: Swift.type(of: error)), "private failure reason"])
+        #expect(fields.map(\.privacy) == [.public, .public, .public, .private])
+    }
+
+    @Test("error messages are redacted before buffering")
+    func validateErrorMessagesAreRedactedBeforeBuffering() {
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
+            OpalDiagnostics.logger(category: .diagnostics).record(
+                event: "diagnostics.operation_failed",
+                level: .error,
+                fields: [
+                    .errorCode("diagnostics.operation_failed"),
+                    .errorMessage("private failure reason")
+                ]
+            )
+
+            let fields = OpalDiagnostics.recentRecords.first?.fields
+            #expect(fields?.map(\.name) == ["error_code", "error_message"])
+            #expect(fields?.map(\.value) == ["diagnostics.operation_failed", "<redacted>"])
+            #expect(fields?.map(\.privacy) == [.public, .private])
+        }
+    }
+
+    @Test("error fields do not change silent default behavior")
+    func validateErrorFieldsDoNotChangeSilentDefaultBehavior() {
+        OpalDiagnostics.withConfiguration(.init()) {
+            OpalDiagnostics.logger(category: .diagnostics).record(
+                event: "diagnostics.operation_failed",
+                level: .error,
+                fields: [
+                    .errorCode("diagnostics.operation_failed"),
+                    .errorType(URLError(.badServerResponse)),
+                    .errorMessage("private failure reason")
+                ]
+            )
+
+            #expect(OpalDiagnostics.recentRecords.isEmpty)
+        }
     }
 
     @Test("private fields are redacted before buffering")

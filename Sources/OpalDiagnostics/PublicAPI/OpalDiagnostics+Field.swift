@@ -62,6 +62,24 @@ extension OpalDiagnostics.Field {
     }
 }
 
+public extension OpalDiagnostics.Field {
+    static func errorCode(_ code: OpalDiagnostics.ErrorCode) -> Self {
+        Self(name: "error_code", publicValue: code.rawValue)
+    }
+
+    static func errorCode(_ rawValue: String) -> Self {
+        errorCode(OpalDiagnostics.ErrorCode(rawValue: rawValue))
+    }
+
+    static func errorType(_ error: Swift.Error) -> Self {
+        Self(name: "error_type", publicValue: String(reflecting: Swift.type(of: error)))
+    }
+
+    static func errorMessage(_ message: String) -> Self {
+        Self(name: "error_message", value: message, privacy: .private)
+    }
+}
+
 private extension OpalDiagnostics.Field {
     static func formatDuration(_ duration: Duration) -> String {
         let components = duration.components

@@ -7,17 +7,20 @@ public extension OpalDiagnostics {
         public var minimumLevel: Level
         public var categoryFilter: CategoryFilter
         public var bufferPolicy: BufferPolicy
+        public var routingPolicy: RoutingPolicy
 
         public init(
             subsystem: String = "com.58opals.opal",
             minimumLevel: Level = .notice,
             categoryFilter: CategoryFilter = .all,
-            bufferPolicy: BufferPolicy = .disabled
+            bufferPolicy: BufferPolicy = .disabled,
+            routingPolicy: RoutingPolicy = .disabled
         ) {
             self.subsystem = subsystem
             self.minimumLevel = minimumLevel
             self.categoryFilter = categoryFilter
             self.bufferPolicy = bufferPolicy
+            self.routingPolicy = routingPolicy
         }
     }
 }

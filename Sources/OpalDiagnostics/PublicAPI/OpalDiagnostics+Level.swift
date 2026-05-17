@@ -1,7 +1,5 @@
 // OpalDiagnostics+Level.swift
 
-import OSLog
-
 public extension OpalDiagnostics {
     /// A diagnostic severity level with threshold ordering.
     ///
@@ -20,21 +18,6 @@ public extension OpalDiagnostics {
 }
 
 extension OpalDiagnostics.Level {
-    var osLogType: OSLogType {
-        switch self {
-        case .debug:
-            .debug
-        case .info:
-            .info
-        case .notice:
-            .default
-        case .error:
-            .error
-        case .fault:
-            .fault
-        }
-    }
-
     private var rank: Int {
         switch self {
         case .debug:

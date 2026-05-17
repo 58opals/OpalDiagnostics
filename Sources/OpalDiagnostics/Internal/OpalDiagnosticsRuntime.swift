@@ -1,13 +1,15 @@
 // OpalDiagnosticsRuntime.swift
 
 import Foundation
-import OSLog
 
 final class OpalDiagnosticsRuntime: @unchecked Sendable {
     static let shared = OpalDiagnosticsRuntime()
 
     @TaskLocal private static var scopedContext: DiagnosticsRuntimeContext?
+    @TaskLocal private static var scopedRecordRouter: (any DiagnosticRecordRouting)?
     @TaskLocal private static var scopedTraceID: OpalDiagnostics.TraceID?
+
+    private static let osLogRecordRouter = OSLogDiagnosticRecordRouter()
 
     private let globalContext = DiagnosticsRuntimeContext(configuration: .init())
 
@@ -55,6 +57,24 @@ final class OpalDiagnosticsRuntime: @unchecked Sendable {
         }
     }
 
+    func withRecordRouter<Success>(
+        _ router: any DiagnosticRecordRouting,
+        operation: () throws -> Success
+    ) rethrows -> Success {
+        try Self.$scopedRecordRouter.withValue(router) {
+            try operation()
+        }
+    }
+
+    func withRecordRouter<Success>(
+        _ router: any DiagnosticRecordRouting,
+        operation: () async throws -> Success
+    ) async rethrows -> Success {
+        try await Self.$scopedRecordRouter.withValue(router) {
+            try await operation()
+        }
+    }
+
     func withTraceID<Success>(
         _ traceID: OpalDiagnostics.TraceID?,
         operation: () throws -> Success
@@ -90,13 +110,15 @@ final class OpalDiagnosticsRuntime: @unchecked Sendable {
             return
         }
 
-        route(routedRecord.record, subsystem: routedRecord.subsystem)
+        guard routedRecord.shouldRouteToOSLog else {
+            return
+        }
+
+        (Self.scopedRecordRouter ?? Self.osLogRecordRouter).route(
+            routedRecord.record,
+            subsystem: routedRecord.subsystem
+        )
     }
 
     private init() {}
-
-    private func route(_ record: OpalDiagnostics.Record, subsystem: String) {
-        let logger = Logger(subsystem: subsystem, category: record.category.rawValue)
-        logger.log(level: record.level.osLogType, "\(record.formattedMessage, privacy: .public)")
-    }
 }

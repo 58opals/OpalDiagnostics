@@ -43,12 +43,18 @@ final class DiagnosticsRuntimeContext: @unchecked Sendable {
         level: OpalDiagnostics.Level,
         traceID: OpalDiagnostics.TraceID?,
         fields: [OpalDiagnostics.Field]
-    ) -> (record: OpalDiagnostics.Record, subsystem: String)? {
+    ) -> (record: OpalDiagnostics.Record, subsystem: String, shouldRouteToOSLog: Bool)? {
         lock.lock()
         defer { lock.unlock() }
 
         let configuration = activeConfiguration
         guard level >= configuration.minimumLevel, configuration.categoryFilter.allows(category) else {
+            return nil
+        }
+
+        let shouldRetainRecord = configuration.bufferPolicy.capacity > 0
+        let shouldRouteToOSLog = configuration.routingPolicy == .osLog
+        guard shouldRetainRecord || shouldRouteToOSLog else {
             return nil
         }
 
@@ -59,8 +65,11 @@ final class DiagnosticsRuntimeContext: @unchecked Sendable {
             traceID: traceID,
             fields: fields
         )
-        recentRecordBuffer.append(record)
 
-        return (record, configuration.subsystem)
+        if shouldRetainRecord {
+            recentRecordBuffer.append(record)
+        }
+
+        return (record, configuration.subsystem, shouldRouteToOSLog)
     }
 }

@@ -42,17 +42,33 @@ extension OpalDiagnostics.Record {
         }
 
         if fields.isEmpty == false {
-            components.append(fields.map { "\($0.name)=\(Self.formatMessageValue($0.value))" }.joined(separator: " "))
+            components.append(fields.map { "\(Self.formatMessageKey($0.name))=\(Self.formatMessageValue($0.value))" }.joined(separator: " "))
         }
 
         return components.joined(separator: " ")
     }
 
-    private static func formatMessageValue(_ value: String) -> String {
-        guard value.isEmpty || value.contains(where: \.isWhitespace) || value.contains("\"") || value.contains("\\") else {
+    private static func formatMessageKey(_ value: String) -> String {
+        guard messageValueNeedsQuotes(value) || value.contains("=") else {
             return value
         }
 
+        return quotedMessageValue(value)
+    }
+
+    private static func formatMessageValue(_ value: String) -> String {
+        guard messageValueNeedsQuotes(value) else {
+            return value
+        }
+
+        return quotedMessageValue(value)
+    }
+
+    private static func messageValueNeedsQuotes(_ value: String) -> Bool {
+        value.isEmpty || value.contains(where: { $0.isWhitespace || $0 == "\"" || $0 == "\\" })
+    }
+
+    private static func quotedMessageValue(_ value: String) -> String {
         var escapedValue = ""
 
         for character in value {

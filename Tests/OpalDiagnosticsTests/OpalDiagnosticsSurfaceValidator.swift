@@ -12,6 +12,7 @@ struct OpalDiagnosticsSurfaceValidator {
         _ = OpalDiagnostics.logger(category: .diagnostics)
         _ = OpalDiagnostics.Event(rawValue: "diagnostics.started")
         _ = OpalDiagnostics.RecordQuery(category: .diagnostics)
+        _ = OpalDiagnostics.RoutingPolicy.disabled
         _ = OpalDiagnostics.currentTraceID
 
         let categories: [OpalDiagnostics.Category] = [.diagnostics, .network, .persistence, .security, .base, .crypto, .fusion, .hedge, .fulcrum]
@@ -28,10 +29,26 @@ struct OpalDiagnosticsSurfaceValidator {
             #expect(configuration.minimumLevel == .notice)
             #expect(configuration.categoryFilter == .all)
             #expect(configuration.bufferPolicy == .disabled)
+            #expect(configuration.routingPolicy == .disabled)
 
             OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.default", level: .notice)
 
             #expect(OpalDiagnostics.recentRecords.isEmpty)
+        }
+    }
+
+    @Test("buffering is explicit and independent from routing")
+    func validateBufferingIsExplicitAndIndependentFromRouting() {
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .disabled)) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.unbuffered", level: .debug)
+
+            #expect(OpalDiagnostics.recentRecords.isEmpty)
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10), routingPolicy: .disabled)) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.buffered", level: .debug)
+
+            #expect(OpalDiagnostics.recentRecords.map(\.event.rawValue) == ["diagnostics.buffered"])
         }
     }
 

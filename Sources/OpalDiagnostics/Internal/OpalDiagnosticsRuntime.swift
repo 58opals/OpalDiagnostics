@@ -37,6 +37,10 @@ final class OpalDiagnosticsRuntime: @unchecked Sendable {
         currentContext.clearRecentRecords()
     }
 
+    func isEnabled(category: OpalDiagnostics.Category, level: OpalDiagnostics.Level) -> Bool {
+        currentContext.isEnabled(category: category, level: level)
+    }
+
     func withConfiguration<Success>(
         _ configuration: OpalDiagnostics.Configuration,
         operation: () throws -> Success

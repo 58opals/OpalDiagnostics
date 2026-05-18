@@ -79,6 +79,103 @@ struct OpalDiagnosticsRoutingValidator {
         #expect(router.routes.map { $0.record.event.rawValue } == ["security.error"])
     }
 
+    @Test("logger enablement follows recording policies")
+    func validateLoggerEnablementFollowsRecordingPolicies() {
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .disabled)) {
+            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .debug) == false)
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10))) {
+            let logger = OpalDiagnostics.logger(category: .diagnostics)
+
+            #expect(logger.isEnabled(level: .debug) == false)
+            #expect(logger.isEnabled(level: .notice))
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10))) {
+            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .error) == false)
+            #expect(OpalDiagnostics.logger(category: .security).isEnabled(level: .debug))
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 0), routingPolicy: .disabled)) {
+            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .debug) == false)
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .osLog)) {
+            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .debug))
+        }
+    }
+
+    @Test("lazy fields are not evaluated when diagnostics are disabled")
+    func validateLazyFieldsAreNotEvaluatedWhenDiagnosticsAreDisabled() {
+        var evaluationCount = 0
+
+        func fields() -> [OpalDiagnostics.Field] {
+            evaluationCount += 1
+            return [.init(name: "payload", publicValue: "built")]
+        }
+
+        OpalDiagnostics.withConfiguration(.init()) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.default", level: .fault, fields: fields)
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10))) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.below_level", level: .debug, fields: fields)
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10))) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.filtered", level: .error, fields: fields)
+        }
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .disabled)) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.unrouted", level: .debug, fields: fields)
+        }
+
+        #expect(evaluationCount == 0)
+    }
+
+    @Test("lazy fields are evaluated for retained and routed records")
+    func validateLazyFieldsAreEvaluatedForRetainedAndRoutedRecords() throws {
+        let router = RecordingDiagnosticRecordRouter()
+        let traceID = OpalDiagnostics.TraceID(rawValue: "lazy-trace")
+        var evaluationCount = 0
+        var retainedRecords: [OpalDiagnostics.Record] = []
+
+        OpalDiagnosticsRuntime.shared.withRecordRouter(router) {
+            OpalDiagnostics.withConfiguration(.init(
+                subsystem: "com.example.opal.lazy",
+                minimumLevel: .debug,
+                bufferPolicy: .enabled(capacity: 10),
+                routingPolicy: .osLog
+            )) {
+                OpalDiagnostics.logger(category: .diagnostics).record(
+                    event: "diagnostics.lazy",
+                    level: .debug,
+                    traceID: traceID,
+                    fields: {
+                        evaluationCount += 1
+                        return [
+                            .init(name: "token", value: "secret-token", privacy: .private),
+                            .init(name: "payload", publicValue: "built")
+                        ]
+                    }
+                )
+                retainedRecords = OpalDiagnostics.recentRecords
+            }
+        }
+
+        let record = try #require(retainedRecords.first)
+        let route = try #require(router.routes.first)
+        #expect(evaluationCount == 1)
+        #expect(retainedRecords.count == 1)
+        #expect(router.routes.count == 1)
+        #expect(record.event == "diagnostics.lazy")
+        #expect(record.traceID == traceID)
+        #expect(record.fields.map(\.value) == ["<redacted>", "built"])
+        #expect(route.subsystem == "com.example.opal.lazy")
+        #expect(route.record == record)
+    }
+
     @Test("async scoped routing uses the active record router")
     func validateAsyncScopedRoutingUsesActiveRecordRouter() async {
         let router = RecordingDiagnosticRecordRouter()

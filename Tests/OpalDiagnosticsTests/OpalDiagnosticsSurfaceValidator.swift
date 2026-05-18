@@ -9,7 +9,8 @@ struct OpalDiagnosticsSurfaceValidator {
     @Test("public facade is available to package clients")
     func validatePublicFacadeIsAvailableToPackageClients() {
         _ = OpalDiagnostics.self
-        _ = OpalDiagnostics.logger(category: .diagnostics)
+        let logger = OpalDiagnostics.logger(category: .diagnostics)
+        _ = logger.isEnabled(level: .notice)
         _ = OpalDiagnostics.Event(rawValue: "diagnostics.started")
         _ = OpalDiagnostics.ErrorCode(rawValue: "diagnostics.failed")
         _ = OpalDiagnostics.RecordQuery(category: .diagnostics)
@@ -19,6 +20,10 @@ struct OpalDiagnosticsSurfaceValidator {
         let categories: [OpalDiagnostics.Category] = [.diagnostics, .network, .persistence, .security, .base, .crypto, .fusion, .hedge, .fulcrum]
 
         #expect(categories.map(\.rawValue) == ["diagnostics", "network", "persistence", "security", "base", "crypto", "fusion", "hedge", "fulcrum"])
+
+        OpalDiagnostics.withConfiguration(.init()) {
+            logger.record(event: "diagnostics.public_facade", level: .notice, fields: { [] })
+        }
     }
 
     @Test("default configuration is public safe")

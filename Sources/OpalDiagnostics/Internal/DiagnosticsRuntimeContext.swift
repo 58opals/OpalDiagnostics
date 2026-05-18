@@ -37,6 +37,12 @@ final class DiagnosticsRuntimeContext: @unchecked Sendable {
         lock.unlock()
     }
 
+    func isEnabled(category: OpalDiagnostics.Category, level: OpalDiagnostics.Level) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordingDecision(category: category, level: level) != nil
+    }
+
     func record(
         event: OpalDiagnostics.Event,
         category: OpalDiagnostics.Category,
@@ -47,14 +53,7 @@ final class DiagnosticsRuntimeContext: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        let configuration = activeConfiguration
-        guard level >= configuration.minimumLevel, configuration.categoryFilter.allows(category) else {
-            return nil
-        }
-
-        let shouldRetainRecord = configuration.bufferPolicy.capacity > 0
-        let shouldRouteToOSLog = configuration.routingPolicy == .osLog
-        guard shouldRetainRecord || shouldRouteToOSLog else {
+        guard let decision = recordingDecision(category: category, level: level) else {
             return nil
         }
 
@@ -66,10 +65,28 @@ final class DiagnosticsRuntimeContext: @unchecked Sendable {
             fields: fields
         )
 
-        if shouldRetainRecord {
+        if decision.shouldRetainRecord {
             recentRecordBuffer.append(record)
         }
 
-        return (record, configuration.subsystem, shouldRouteToOSLog)
+        return (record, decision.configuration.subsystem, decision.shouldRouteToOSLog)
+    }
+
+    private func recordingDecision(
+        category: OpalDiagnostics.Category,
+        level: OpalDiagnostics.Level
+    ) -> (configuration: OpalDiagnostics.Configuration, shouldRetainRecord: Bool, shouldRouteToOSLog: Bool)? {
+        let configuration = activeConfiguration
+        guard level >= configuration.minimumLevel, configuration.categoryFilter.allows(category) else {
+            return nil
+        }
+
+        let shouldRetainRecord = configuration.bufferPolicy.capacity > 0
+        let shouldRouteToOSLog = configuration.routingPolicy == .osLog
+        guard shouldRetainRecord || shouldRouteToOSLog else {
+            return nil
+        }
+
+        return (configuration, shouldRetainRecord, shouldRouteToOSLog)
     }
 }

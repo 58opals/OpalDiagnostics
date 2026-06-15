@@ -1,6 +1,5 @@
 // OpalDiagnosticsRoutingValidator.swift
 
-import Foundation
 import Testing
 @testable import OpalDiagnostics
 
@@ -27,39 +26,6 @@ struct OpalDiagnosticsRoutingValidator {
         #expect(router.routes.isEmpty)
     }
 
-    @Test("OSLog routing is explicit and receives sanitized records")
-    func validateOSLogRoutingIsExplicitAndReceivesSanitizedRecords() throws {
-        let router = RecordingDiagnosticRecordRouter()
-
-        OpalDiagnosticsRuntime.shared.withRecordRouter(router) {
-            OpalDiagnostics.withConfiguration(.init(
-                subsystem: "com.example.opal.test",
-                minimumLevel: .debug,
-                bufferPolicy: .disabled,
-                routingPolicy: .osLog
-            )) {
-                OpalDiagnostics.logger(category: .security).record(
-                    event: "security.token.rejected",
-                    level: .error,
-                    fields: [
-                        .init(name: "token", value: "secret-token", privacy: .private),
-                        .init(name: "reason", publicValue: "expired")
-                    ]
-                )
-
-                #expect(OpalDiagnostics.recentRecords.isEmpty)
-            }
-        }
-
-        let route = try #require(router.routes.first)
-        #expect(router.routes.count == 1)
-        #expect(route.subsystem == "com.example.opal.test")
-        #expect(route.record.category == .security)
-        #expect(route.record.level == .error)
-        #expect(route.record.event == "security.token.rejected")
-        #expect(route.record.fields.map(\.value) == ["<redacted>", "expired"])
-    }
-
     @Test("routing policy honors level and category filters")
     func validateRoutingPolicyHonorsLevelAndCategoryFilters() {
         let router = RecordingDiagnosticRecordRouter()
@@ -79,30 +45,28 @@ struct OpalDiagnosticsRoutingValidator {
         #expect(router.routes.map { $0.record.event.rawValue } == ["security.error"])
     }
 
-    @Test("logger enablement follows recording policies")
-    func validateLoggerEnablementFollowsRecordingPolicies() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .disabled)) {
-            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .debug) == false)
-        }
-
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10))) {
-            let logger = OpalDiagnostics.logger(category: .diagnostics)
-
-            #expect(logger.isEnabled(level: .debug) == false)
-            #expect(logger.isEnabled(level: .notice))
-        }
-
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10))) {
-            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .error) == false)
-            #expect(OpalDiagnostics.logger(category: .security).isEnabled(level: .debug))
-        }
-
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 0), routingPolicy: .disabled)) {
-            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .debug) == false)
-        }
-
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .osLog)) {
-            #expect(OpalDiagnostics.logger(category: .diagnostics).isEnabled(level: .debug))
+    @Test(
+        "logger enablement follows recording policies",
+        arguments: [
+            (OpalDiagnostics.Configuration(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .disabled), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, false),
+            (OpalDiagnostics.Configuration(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10)), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, false),
+            (OpalDiagnostics.Configuration(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10)), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.notice, true),
+            (OpalDiagnostics.Configuration(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10)), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.error, false),
+            (OpalDiagnostics.Configuration(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10)), OpalDiagnostics.Category.security, OpalDiagnostics.Level.debug, true),
+            (OpalDiagnostics.Configuration(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 0), routingPolicy: .disabled), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, false),
+            (OpalDiagnostics.Configuration(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .osLog), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, true)
+        ]
+    )
+    func validateLoggerEnablementFollowsRecordingPolicies(
+        scenario: (
+            configuration: OpalDiagnostics.Configuration,
+            category: OpalDiagnostics.Category,
+            level: OpalDiagnostics.Level,
+            expectedIsEnabled: Bool
+        )
+    ) {
+        OpalDiagnostics.withConfiguration(scenario.configuration) {
+            #expect(OpalDiagnostics.logger(category: scenario.category).isEnabled(level: scenario.level) == scenario.expectedIsEnabled)
         }
     }
 

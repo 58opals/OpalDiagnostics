@@ -4,11 +4,14 @@ import Foundation
 
 public extension OpalDiagnostics {
     /// A key-value diagnostic field whose value is stored according to explicit privacy.
+    ///
+    /// Field names should be static, non-sensitive, and low-cardinality because they are retained and routed as diagnostic keys. Use public fields only for stable, low-cardinality values that are safe in retained records and OSLog. Use private fields for payloads, secrets, user-chain identifiers, endpoint details, addresses, and dynamic error details.
     struct Field: Hashable, Sendable {
         public let name: String
         public let value: String
         public let privacy: FieldPrivacy
 
+        /// Returns the value that is safe to retain or route outside the diagnostics runtime.
         public var redactedValue: String {
             switch privacy {
             case .public:
@@ -63,6 +66,20 @@ extension OpalDiagnostics.Field {
 }
 
 public extension OpalDiagnostics.Field {
+    /// Creates a field for a stable, low-cardinality value that is safe to retain and route publicly.
+    ///
+    /// Do not use this for payloads, secrets, user-chain identifiers, endpoint details, addresses, or dynamic error details.
+    static func publicField(_ name: String, value: String) -> Self {
+        Self(name: name, publicValue: value)
+    }
+
+    /// Creates a field whose value must be redacted before records are retained or routed.
+    ///
+    /// Use this for payloads, secrets, user-chain identifiers, endpoint details, addresses, and dynamic error details unless a public classification has been explicitly justified.
+    static func privateField(_ name: String, value: String) -> Self {
+        Self(name: name, value: value, privacy: .private)
+    }
+
     static func errorCode(_ code: OpalDiagnostics.ErrorCode) -> Self {
         Self(name: "error_code", publicValue: code.rawValue)
     }
@@ -76,7 +93,7 @@ public extension OpalDiagnostics.Field {
     }
 
     static func errorMessage(_ message: String) -> Self {
-        Self(name: "error_message", value: message, privacy: .private)
+        privateField("error_message", value: message)
     }
 }
 

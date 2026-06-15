@@ -4,6 +4,8 @@ import Foundation
 
 public extension OpalDiagnostics {
     /// A sanitized diagnostic event retained for debug export.
+    ///
+    /// Private field values are redacted during record construction before the record can be retained or routed.
     struct Record: Identifiable, Equatable, Sendable {
         public let id: UUID
         public let timestamp: Date
@@ -41,7 +43,7 @@ extension OpalDiagnostics.Record {
             components.append("trace_id=\(Self.formatMessageValue(traceID.rawValue))")
         }
 
-        components += fields.map { "\(Self.formatMessageKey($0.name))=\(Self.formatMessageValue($0.value))" }
+        components += fields.map { "\(Self.formatMessageKey($0.name))=\(Self.formatMessageValue($0.redactedValue))" }
 
         return components.joined(separator: " ")
     }

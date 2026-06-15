@@ -28,9 +28,11 @@ Exact category filters preserve exact matching with `.enabled(_:)` and `.exclude
 
 ## Event Privacy
 
-Event names must be static, non-sensitive, and low-cardinality. Do not embed wallet data, user data, secrets, network responses, addresses, transaction details, or other runtime values in an event name. Pass all dynamic values through `OpalDiagnostics.Field` with explicit `FieldPrivacy` so private values are redacted before enabled OSLog routing or recent-record export.
+Event names must be static, non-sensitive, and low-cardinality. Do not embed wallet data, user data, secrets, network responses, addresses, transaction details, or other runtime values in an event name. Pass all dynamic values through `OpalDiagnostics.Field` with an explicit public or private classification so private values are redacted before enabled OSLog routing or recent-record export.
 
-`OpalDiagnostics.Field` stores values as strings and provides public-safe convenience initializers for `Int`, `UInt64`, `Bool`, `UUID`, `Duration`, byte counts, and explicit public strings. Keep private or sensitive runtime strings on `init(name:value:privacy:)` with `.private`.
+Field names must also be static, non-sensitive, and low-cardinality because they are retained and routed as diagnostic keys. Put dynamic runtime data in field values, not field names.
+
+`OpalDiagnostics.Field` stores values as strings and provides public-safe convenience initializers for `Int`, `UInt64`, `Bool`, `UUID`, `Duration`, byte counts, and explicit public strings. Use `OpalDiagnostics.Field.publicField(_:value:)` only for stable, low-cardinality values that are safe in retained records and OSLog. Use `OpalDiagnostics.Field.privateField(_:value:)` for payloads, secrets, user-chain identifiers, endpoint details, addresses, and other sensitive runtime strings unless a public classification has been explicitly justified. Existing `init(name:value:privacy:)` call sites remain source-compatible when callers need to pass privacy explicitly.
 
 Use `OpalDiagnostics.ErrorCode` for stable, package-owned error identifiers that should be emitted as diagnostics fields without introducing package-local diagnostics error-code types. `OpalDiagnostics.Field.errorCode(_:)` writes public `error_code`, `errorType(_:)` writes public `error_type`, and `errorMessage(_:)` writes private `error_message` so messages are redacted before routing or recent-record export.
 

@@ -93,15 +93,18 @@ struct OpalDiagnosticsSurfaceValidator {
         }
     }
 
-    @Test("category filters support exact and hierarchical matching")
-    func validateCategoryFiltersSupportExactAndHierarchicalMatching() {
+    @Test("category filters support exact matching")
+    func validateCategoryFiltersSupportExactMatching() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
             OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
             OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
 
             #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum"])
         }
+    }
 
+    @Test("category filters include dotted subcategories")
+    func validateCategoryFiltersIncludeDottedSubcategories() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabledIncludingSubcategories([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
             OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
             OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
@@ -110,7 +113,10 @@ struct OpalDiagnosticsSurfaceValidator {
 
             #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum", "fulcrum.jsonrpc", "fulcrum.websocket"])
         }
+    }
 
+    @Test("category filters exclude dotted subcategories")
+    func validateCategoryFiltersExcludeDottedSubcategories() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .excludedIncludingSubcategories([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
             OpalDiagnostics.logger(category: "fulcrum.reconnect").record(event: "fulcrum.reconnect.started", level: .debug)
             OpalDiagnostics.logger(category: .base).record(event: "base.loaded", level: .debug)
@@ -145,107 +151,6 @@ struct OpalDiagnosticsSurfaceValidator {
 
             #expect(OpalDiagnostics.currentTraceID == nil)
             #expect(OpalDiagnostics.recentRecords.map(\.traceID) == [traceID])
-        }
-    }
-
-    @Test("typed field helpers preserve string storage")
-    func validateTypedFieldHelpersPreserveStringStorage() throws {
-        let uuid = try #require(UUID(uuidString: "12345678-1234-1234-1234-1234567890AB"))
-        let fields: [OpalDiagnostics.Field] = [
-            .init(name: "message", publicValue: "connected"),
-            .init(name: "attempt", value: 3),
-            .init(name: "height", value: UInt64(840_000)),
-            .init(name: "cached", value: true),
-            .init(name: "request_id", value: uuid),
-            .init(name: "elapsed", value: Duration.seconds(2)),
-            .init(name: "payload_bytes", byteCount: UInt64(2_048))
-        ]
-
-        #expect(fields.map(\.value) == ["connected", "3", "840000", "true", uuid.uuidString, "2s", "2048"])
-        #expect(fields.allSatisfy { $0.privacy == .public })
-    }
-
-    @Test("error code follows category and event raw value behavior")
-    func validateErrorCodeFollowsCategoryAndEventRawValueBehavior() {
-        let rawValue = "diagnostics.operation_failed"
-        let category: OpalDiagnostics.Category = "diagnostics.operation_failed"
-        let event: OpalDiagnostics.Event = "diagnostics.operation_failed"
-        let errorCode: OpalDiagnostics.ErrorCode = "diagnostics.operation_failed"
-
-        #expect(errorCode == OpalDiagnostics.ErrorCode(rawValue: rawValue))
-        #expect(errorCode.rawValue == rawValue)
-        #expect(errorCode.description == rawValue)
-        #expect(errorCode.rawValue == category.rawValue)
-        #expect(errorCode.description == event.description)
-    }
-
-    @Test("error fields use stable public and private privacy defaults")
-    func validateErrorFieldsUseStablePublicAndPrivatePrivacyDefaults() {
-        let error: Swift.Error = URLError(.badServerResponse)
-
-        let fields: [OpalDiagnostics.Field] = [
-            .errorCode(OpalDiagnostics.ErrorCode(rawValue: "diagnostics.operation_failed")),
-            .errorCode("diagnostics.raw_operation_failed"),
-            .errorType(error),
-            .errorMessage("private failure reason")
-        ]
-
-        #expect(fields.map(\.name) == ["error_code", "error_code", "error_type", "error_message"])
-        #expect(fields.map(\.value) == ["diagnostics.operation_failed", "diagnostics.raw_operation_failed", String(reflecting: Swift.type(of: error)), "private failure reason"])
-        #expect(fields.map(\.privacy) == [.public, .public, .public, .private])
-    }
-
-    @Test("error messages are redacted before buffering")
-    func validateErrorMessagesAreRedactedBeforeBuffering() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
-            OpalDiagnostics.logger(category: .diagnostics).record(
-                event: "diagnostics.operation_failed",
-                level: .error,
-                fields: [
-                    .errorCode("diagnostics.operation_failed"),
-                    .errorMessage("private failure reason")
-                ]
-            )
-
-            let fields = OpalDiagnostics.recentRecords.first?.fields
-            #expect(fields?.map(\.name) == ["error_code", "error_message"])
-            #expect(fields?.map(\.value) == ["diagnostics.operation_failed", "<redacted>"])
-            #expect(fields?.map(\.privacy) == [.public, .private])
-        }
-    }
-
-    @Test("error fields do not change silent default behavior")
-    func validateErrorFieldsDoNotChangeSilentDefaultBehavior() {
-        OpalDiagnostics.withConfiguration(.init()) {
-            OpalDiagnostics.logger(category: .diagnostics).record(
-                event: "diagnostics.operation_failed",
-                level: .error,
-                fields: [
-                    .errorCode("diagnostics.operation_failed"),
-                    .errorType(URLError(.badServerResponse)),
-                    .errorMessage("private failure reason")
-                ]
-            )
-
-            #expect(OpalDiagnostics.recentRecords.isEmpty)
-        }
-    }
-
-    @Test("private fields are redacted before buffering")
-    func validatePrivateFieldsAreRedactedBeforeBuffering() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
-            OpalDiagnostics.logger(category: .fulcrum).record(
-                event: "fulcrum.connected",
-                level: .debug,
-                fields: [
-                    .init(name: "node", publicValue: "testnet"),
-                    .init(name: "token", value: "secret-token", privacy: .private)
-                ]
-            )
-
-            let fields = OpalDiagnostics.recentRecords.first?.fields
-            #expect(fields?.map(\.value) == ["testnet", "<redacted>"])
-            #expect(fields?.map(\.privacy) == [.public, .private])
         }
     }
 

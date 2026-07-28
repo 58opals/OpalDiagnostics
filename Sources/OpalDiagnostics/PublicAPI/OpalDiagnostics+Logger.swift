@@ -30,7 +30,9 @@ public extension OpalDiagnostics {
             )
         }
 
-        /// Records a stable event name with fields built only when diagnostics are enabled.
+        /// Records a stable event name with fields built after an initial enablement check succeeds.
+        ///
+        /// A concurrent global reconfiguration can change the final recording decision after this check.
         public func record(
             event: Event,
             level: Level = .notice,

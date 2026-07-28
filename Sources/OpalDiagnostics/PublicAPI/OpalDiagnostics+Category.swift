@@ -1,7 +1,9 @@
 // OpalDiagnostics+Category.swift
 
 public extension OpalDiagnostics {
-    /// A diagnostics category used for runtime filtering and OSLog routing.
+    /// A static, non-sensitive diagnostics category used for runtime filtering and OSLog routing.
+    ///
+    /// Category names are retained and passed to OSLog as public metadata. Do not include user data, secrets, identifiers, or other dynamic payload values.
     struct Category: RawRepresentable, Hashable, Sendable, ExpressibleByStringLiteral, CustomStringConvertible {
         public let rawValue: String
 

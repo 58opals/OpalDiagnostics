@@ -4,6 +4,7 @@ public extension OpalDiagnostics {
     /// Runtime policy for retaining recent sanitized diagnostic records.
     enum BufferPolicy: Equatable, Sendable {
         case disabled
+        /// Retains up to `capacity` records. A nonpositive capacity disables retention.
         case enabled(capacity: Int)
     }
 }

@@ -2,7 +2,7 @@
 
 import Foundation
 
-final class OpalDiagnosticsRuntime: @unchecked Sendable {
+final class OpalDiagnosticsRuntime: Sendable {
     static let shared = OpalDiagnosticsRuntime()
 
     @TaskLocal private static var scopedContext: DiagnosticsRuntimeContext?

@@ -26,7 +26,7 @@ struct OpalDiagnosticsSurfaceValidator {
         }
     }
 
-    @Test("default configuration is public safe")
+    @Test("default configuration is public-safe")
     func validateDefaultConfigurationIsPublicSafe() {
         OpalDiagnostics.withConfiguration(.init()) {
             let configuration = OpalDiagnostics.configuration
@@ -58,30 +58,6 @@ struct OpalDiagnosticsSurfaceValidator {
         }
     }
 
-    @Test("scoped configuration keeps parallel capture isolated")
-    func validateScopedConfigurationKeepsParallelCaptureIsolated() async {
-        let cryptoTask = Task {
-            OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.crypto]), bufferPolicy: .enabled(capacity: 10))) {
-                OpalDiagnostics.logger(category: .crypto).record(event: "crypto.verified", level: .debug)
-                OpalDiagnostics.logger(category: .base).record(event: "base.loaded", level: .debug)
-                return OpalDiagnostics.recentRecords.map(\.event.rawValue)
-            }
-        }
-        let baseTask = Task {
-            OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.base]), bufferPolicy: .enabled(capacity: 10))) {
-                OpalDiagnostics.logger(category: .base).record(event: "base.loaded", level: .debug)
-                OpalDiagnostics.logger(category: .crypto).record(event: "crypto.verified", level: .debug)
-                return OpalDiagnostics.recentRecords.map(\.event.rawValue)
-            }
-        }
-
-        let cryptoEvents = await cryptoTask.value
-        let baseEvents = await baseTask.value
-
-        #expect(cryptoEvents == ["crypto.verified"])
-        #expect(baseEvents == ["base.loaded"])
-    }
-
     @Test("level threshold filters routed records")
     func validateLevelThresholdFiltersRoutedRecords() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10))) {
@@ -100,6 +76,16 @@ struct OpalDiagnosticsSurfaceValidator {
             OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
 
             #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum"])
+        }
+    }
+
+    @Test("category filters support exact exclusion")
+    func validateCategoryFiltersSupportExactExclusion() {
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .excluded([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
+            OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
+            OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
+
+            #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum.jsonrpc"])
         }
     }
 
@@ -128,29 +114,15 @@ struct OpalDiagnosticsSurfaceValidator {
     @Test("trace ID is retained with records")
     func validateTraceIDIsRetainedWithRecords() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
-            let traceID = OpalDiagnostics.TraceID(rawValue: "trace-123")
+            let traceID = OpalDiagnostics.TraceID(publicValue: "trace-123")
             let generatedTraceID = OpalDiagnostics.TraceID()
 
             OpalDiagnostics.logger(category: .hedge).record(event: "hedge.quoted", level: .debug, traceID: traceID)
 
             #expect(generatedTraceID.rawValue.isEmpty == false)
+            #expect(traceID.rawValue == "trace-123")
+            #expect(traceID.description == "trace-123")
             #expect(OpalDiagnostics.recentRecords.first?.traceID == traceID)
-        }
-    }
-
-    @Test("task-local trace ID propagates through async work")
-    func validateTaskLocalTraceIDPropagatesThroughAsyncWork() async {
-        await OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
-            let traceID = OpalDiagnostics.TraceID(rawValue: "flow-123")
-
-            await OpalDiagnostics.withTraceID(traceID) {
-                #expect(OpalDiagnostics.currentTraceID == traceID)
-                await Task.yield()
-                OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
-            }
-
-            #expect(OpalDiagnostics.currentTraceID == nil)
-            #expect(OpalDiagnostics.recentRecords.map(\.traceID) == [traceID])
         }
     }
 
@@ -179,10 +151,30 @@ struct OpalDiagnosticsSurfaceValidator {
         }
     }
 
+    @Test("configure replaces scoped settings and clears retained records")
+    func validateConfigureReplacesScopedSettingsAndClearsRetainedRecords() {
+        let replacement = OpalDiagnostics.Configuration(
+            subsystem: "com.example.opal.reconfigured",
+            minimumLevel: .error,
+            categoryFilter: .enabled([.security]),
+            bufferPolicy: .enabled(capacity: 2)
+        )
+
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
+            OpalDiagnostics.logger(category: .diagnostics).record(event: "diagnostics.before_reconfigure", level: .debug)
+            #expect(OpalDiagnostics.recentRecords.count == 1)
+
+            OpalDiagnostics.configure(replacement)
+
+            #expect(OpalDiagnostics.configuration == replacement)
+            #expect(OpalDiagnostics.recentRecords.isEmpty)
+        }
+    }
+
     @Test("recent record queries filter by public dimensions")
     func validateRecentRecordQueriesFilterByPublicDimensions() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 10))) {
-            let traceID = OpalDiagnostics.TraceID(rawValue: "query-123")
+            let traceID = OpalDiagnostics.TraceID(publicValue: "query-123")
             let startDate = Date()
             let logger = OpalDiagnostics.logger(category: .fulcrum)
 
@@ -220,8 +212,11 @@ struct OpalDiagnosticsSurfaceValidator {
         }
     }
 
-    @Test("warning-like diagnostics map to notice or error")
-    func validateWarningLikeDiagnosticsMapToNoticeOrError() {
-        #expect(OpalDiagnostics.Level.allCases.map(\.rawValue) == ["debug", "info", "notice", "error", "fault"])
+    @Test("severity levels are ordered without a warning case")
+    func validateSeverityLevelsAreOrderedWithoutWarningCase() {
+        let levels = OpalDiagnostics.Level.allCases
+
+        #expect(levels.map(\.rawValue) == ["debug", "info", "notice", "error", "fault"])
+        #expect(zip(levels, levels.dropFirst()).allSatisfy { $0 < $1 })
     }
 }

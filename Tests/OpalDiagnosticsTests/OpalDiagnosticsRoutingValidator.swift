@@ -54,6 +54,7 @@ struct OpalDiagnosticsRoutingValidator {
             (OpalDiagnostics.Configuration(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10)), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.error, false),
             (OpalDiagnostics.Configuration(minimumLevel: .debug, categoryFilter: .enabled([.security]), bufferPolicy: .enabled(capacity: 10)), OpalDiagnostics.Category.security, OpalDiagnostics.Level.debug, true),
             (OpalDiagnostics.Configuration(minimumLevel: .debug, bufferPolicy: .enabled(capacity: 0), routingPolicy: .disabled), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, false),
+            (OpalDiagnostics.Configuration(minimumLevel: .debug, bufferPolicy: .enabled(capacity: -1), routingPolicy: .disabled), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, false),
             (OpalDiagnostics.Configuration(minimumLevel: .debug, bufferPolicy: .disabled, routingPolicy: .osLog), OpalDiagnostics.Category.diagnostics, OpalDiagnostics.Level.debug, true)
         ]
     )
@@ -101,7 +102,7 @@ struct OpalDiagnosticsRoutingValidator {
     @Test("lazy fields are evaluated for retained and routed records")
     func validateLazyFieldsAreEvaluatedForRetainedAndRoutedRecords() throws {
         let router = RecordingDiagnosticRecordRouter()
-        let traceID = OpalDiagnostics.TraceID(rawValue: "lazy-trace")
+        let traceID = OpalDiagnostics.TraceID(publicValue: "lazy-trace")
         var evaluationCount = 0
         var retainedRecords: [OpalDiagnostics.Record] = []
 
@@ -176,10 +177,12 @@ struct OpalDiagnosticsRoutingValidator {
             category: .diagnostics,
             level: .debug,
             event: "diagnostics.message",
-            traceID: "trace 1",
+            traceID: .init(publicValue: "trace 1"),
             fields: [
                 .init(name: "message", publicValue: "hello world"),
                 .init(name: "quote", publicValue: "a \"b\""),
+                .init(name: "backslash", publicValue: "a\\b"),
+                .init(name: "tab", publicValue: "a\tb"),
                 .init(name: "crlf", publicValue: "a\r\nb"),
                 .init(name: "line", publicValue: "a\nb"),
                 .init(name: "line_separator", publicValue: "a\u{2028}b"),
@@ -188,7 +191,25 @@ struct OpalDiagnosticsRoutingValidator {
             ]
         )
 
-        #expect(record.formattedMessage == #"event=diagnostics.message trace_id="trace 1" message="hello world" quote="a \"b\"" crlf="a\r\nb" line="a\nb" line_separator="a\u{2028}b" paragraph_separator="a\u{2029}b" empty="""#)
+        #expect(record.formattedMessage == #"event=diagnostics.message trace_id="trace 1" message="hello world" quote="a \"b\"" backslash="a\\b" tab="a\tb" crlf="a\r\nb" line="a\nb" line_separator="a\u{2028}b" paragraph_separator="a\u{2029}b" empty="""#)
+    }
+
+    @Test("formatted messages escape control scalars across public metadata")
+    func validateFormattedMessagesEscapeControlScalarsAcrossPublicMetadata() {
+        let record = OpalDiagnostics.Record(
+            category: .diagnostics,
+            level: .debug,
+            event: "diagnostics\u{0}message",
+            traceID: .init(publicValue: "trace\u{1B}"),
+            fields: [
+                .init(name: "field\u{B}", publicValue: "bell\u{7}"),
+                .init(name: "form_feed", publicValue: "a\u{C}b"),
+                .init(name: "next_line", publicValue: "a\u{85}b"),
+                .init(name: "bidi", publicValue: "a\u{202E}b")
+            ]
+        )
+
+        #expect(record.formattedMessage == #"event="diagnostics\u{0}message" trace_id="trace\u{1b}" "field\u{b}"="bell\u{7}" form_feed="a\u{c}b" next_line="a\u{85}b" bidi="a\u{202e}b""#)
     }
 
     @Test("formatted messages quote field names that would break key-value output")

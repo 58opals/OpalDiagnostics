@@ -1,46 +1,51 @@
 // DiagnosticsRuntimeContext.swift
 
-import Foundation
+import Synchronization
 
-final class DiagnosticsRuntimeContext: @unchecked Sendable {
-    private let lock = NSLock()
-    private var activeConfiguration: OpalDiagnostics.Configuration
-    private var recentRecordBuffer: RecentDiagnosticRecordBuffer
+final class DiagnosticsRuntimeContext: Sendable {
+    private let state: Mutex<(
+        configuration: OpalDiagnostics.Configuration,
+        recentRecordBuffer: RecentDiagnosticRecordBuffer
+    )>
 
     var configuration: OpalDiagnostics.Configuration {
-        lock.lock()
-        defer { lock.unlock() }
-        return activeConfiguration
+        state.withLock { $0.configuration }
     }
 
     var recentRecords: [OpalDiagnostics.Record] {
-        lock.lock()
-        defer { lock.unlock() }
-        return recentRecordBuffer.records
+        state.withLock { $0.recentRecordBuffer.records }
     }
 
     init(configuration: OpalDiagnostics.Configuration) {
-        activeConfiguration = configuration
-        recentRecordBuffer = RecentDiagnosticRecordBuffer(policy: configuration.bufferPolicy)
+        state = Mutex((
+            configuration: configuration,
+            recentRecordBuffer: RecentDiagnosticRecordBuffer(policy: configuration.bufferPolicy)
+        ))
     }
 
     func configure(_ configuration: OpalDiagnostics.Configuration) {
-        lock.lock()
-        activeConfiguration = configuration
-        recentRecordBuffer = RecentDiagnosticRecordBuffer(policy: configuration.bufferPolicy)
-        lock.unlock()
+        state.withLock {
+            $0 = (
+                configuration: configuration,
+                recentRecordBuffer: RecentDiagnosticRecordBuffer(policy: configuration.bufferPolicy)
+            )
+        }
     }
 
     func clearRecentRecords() {
-        lock.lock()
-        recentRecordBuffer.clear()
-        lock.unlock()
+        state.withLock {
+            $0.recentRecordBuffer.clear()
+        }
     }
 
     func isEnabled(category: OpalDiagnostics.Category, level: OpalDiagnostics.Level) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return recordingDecision(category: category, level: level) != nil
+        state.withLock {
+            Self.resolveRecordingDecision(
+                configuration: $0.configuration,
+                category: category,
+                level: level
+            ) != nil
+        }
     }
 
     func record(
@@ -50,33 +55,36 @@ final class DiagnosticsRuntimeContext: @unchecked Sendable {
         traceID: OpalDiagnostics.TraceID?,
         fields: [OpalDiagnostics.Field]
     ) -> (record: OpalDiagnostics.Record, subsystem: String, shouldRouteToOSLog: Bool)? {
-        lock.lock()
-        defer { lock.unlock() }
+        state.withLock { state in
+            guard let decision = Self.resolveRecordingDecision(
+                configuration: state.configuration,
+                category: category,
+                level: level
+            ) else {
+                return nil
+            }
 
-        guard let decision = recordingDecision(category: category, level: level) else {
-            return nil
+            let record = OpalDiagnostics.Record(
+                category: category,
+                level: level,
+                event: event,
+                traceID: traceID,
+                fields: fields
+            )
+
+            if decision.shouldRetainRecord {
+                state.recentRecordBuffer.append(record)
+            }
+
+            return (record, decision.configuration.subsystem, decision.shouldRouteToOSLog)
         }
-
-        let record = OpalDiagnostics.Record(
-            category: category,
-            level: level,
-            event: event,
-            traceID: traceID,
-            fields: fields
-        )
-
-        if decision.shouldRetainRecord {
-            recentRecordBuffer.append(record)
-        }
-
-        return (record, decision.configuration.subsystem, decision.shouldRouteToOSLog)
     }
 
-    private func recordingDecision(
+    private static func resolveRecordingDecision(
+        configuration: OpalDiagnostics.Configuration,
         category: OpalDiagnostics.Category,
         level: OpalDiagnostics.Level
     ) -> (configuration: OpalDiagnostics.Configuration, shouldRetainRecord: Bool, shouldRouteToOSLog: Bool)? {
-        let configuration = activeConfiguration
         guard level >= configuration.minimumLevel, configuration.categoryFilter.allows(category) else {
             return nil
         }

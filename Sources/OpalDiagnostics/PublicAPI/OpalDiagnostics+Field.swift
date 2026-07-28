@@ -31,27 +31,27 @@ public extension OpalDiagnostics {
             self.init(name: name, value: publicValue, privacy: .public)
         }
 
-        public init(name: String, value: Int, privacy: FieldPrivacy = .public) {
+        public init(name: String, value: Int, privacy: FieldPrivacy) {
             self.init(name: name, value: String(value), privacy: privacy)
         }
 
-        public init(name: String, value: UInt64, privacy: FieldPrivacy = .public) {
+        public init(name: String, value: UInt64, privacy: FieldPrivacy) {
             self.init(name: name, value: String(value), privacy: privacy)
         }
 
-        public init(name: String, value: Bool, privacy: FieldPrivacy = .public) {
+        public init(name: String, value: Bool, privacy: FieldPrivacy) {
             self.init(name: name, value: String(value), privacy: privacy)
         }
 
-        public init(name: String, value: UUID, privacy: FieldPrivacy = .public) {
+        public init(name: String, value: UUID, privacy: FieldPrivacy) {
             self.init(name: name, value: value.uuidString, privacy: privacy)
         }
 
-        public init(name: String, value: Duration, privacy: FieldPrivacy = .public) {
+        public init(name: String, value: Duration, privacy: FieldPrivacy) {
             self.init(name: name, value: Self.formatDuration(value), privacy: privacy)
         }
 
-        public init(name: String, byteCount: UInt64, privacy: FieldPrivacy = .public) {
+        public init(name: String, byteCount: UInt64, privacy: FieldPrivacy) {
             self.init(name: name, value: byteCount, privacy: privacy)
         }
     }

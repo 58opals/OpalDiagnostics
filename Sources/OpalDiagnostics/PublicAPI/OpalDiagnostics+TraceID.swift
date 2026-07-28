@@ -3,8 +3,10 @@
 import Foundation
 
 public extension OpalDiagnostics {
-    /// A correlation identifier for following one action across package boundaries.
-    struct TraceID: RawRepresentable, Hashable, Sendable, ExpressibleByStringLiteral, CustomStringConvertible {
+    /// An opaque, non-sensitive correlation identifier for following one action across package boundaries.
+    ///
+    /// Trace IDs are retained and routed as public diagnostic metadata. Use `init()` to generate a safe identifier, or pass only an explicitly public opaque token to `init(publicValue:)`.
+    struct TraceID: Hashable, Sendable, CustomStringConvertible {
         public let rawValue: String
 
         public var description: String {
@@ -12,15 +14,11 @@ public extension OpalDiagnostics {
         }
 
         public init() {
-            self.init(rawValue: UUID().uuidString)
+            self.init(publicValue: UUID().uuidString)
         }
 
-        public init(rawValue: String) {
-            self.rawValue = rawValue
-        }
-
-        public init(stringLiteral value: String) {
-            self.init(rawValue: value)
+        public init(publicValue: String) {
+            rawValue = publicValue
         }
     }
 }

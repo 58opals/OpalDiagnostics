@@ -6,21 +6,50 @@ import OpalDiagnostics
 
 @Suite("OpalDiagnostics field public API surface")
 struct OpalDiagnosticsFieldSurfaceValidator {
-    @Test("typed field helpers preserve string storage")
-    func validateTypedFieldHelpersPreserveStringStorage() throws {
+    @Test("typed field helpers preserve string storage and explicit privacy")
+    func validateTypedFieldHelpersPreserveStringStorageAndExplicitPrivacy() throws {
         let uuid = try #require(UUID(uuidString: "12345678-1234-1234-1234-1234567890AB"))
         let fields: [OpalDiagnostics.Field] = [
             .init(name: "message", publicValue: "connected"),
-            .init(name: "attempt", value: 3),
-            .init(name: "height", value: UInt64(840_000)),
-            .init(name: "cached", value: true),
-            .init(name: "request_id", value: uuid),
-            .init(name: "elapsed", value: Duration.seconds(2)),
-            .init(name: "payload_bytes", byteCount: UInt64(2_048))
+            .init(name: "attempt", value: 3, privacy: .public),
+            .init(name: "height", value: UInt64(840_000), privacy: .public),
+            .init(name: "cached", value: true, privacy: .public),
+            .init(name: "request_id", value: uuid, privacy: .public),
+            .init(name: "elapsed", value: Duration.seconds(2), privacy: .public),
+            .init(name: "payload_bytes", byteCount: UInt64(2_048), privacy: .public)
+        ]
+        let privateFields: [OpalDiagnostics.Field] = [
+            .init(name: "balance", value: 42, privacy: .private),
+            .init(name: "request_id", value: uuid, privacy: .private),
+            .init(name: "elapsed", value: Duration.milliseconds(500), privacy: .private)
         ]
 
         #expect(fields.map(\.value) == ["connected", "3", "840000", "true", uuid.uuidString, "2s", "2048"])
         #expect(fields.allSatisfy { $0.privacy == .public })
+        #expect(privateFields.allSatisfy { $0.privacy == .private })
+        #expect(privateFields.map(\.redactedValue) == ["<redacted>", "<redacted>", "<redacted>"])
+    }
+
+    @Test(
+        "duration fields use stable decimal seconds",
+        arguments: [
+            (Duration.zero, "0s"),
+            (Duration.milliseconds(1_500), "1.5s"),
+            (Duration.milliseconds(-500), "-0.5s"),
+            (Duration.milliseconds(-1_500), "-1.5s"),
+            (Duration.nanoseconds(1), "0.000000001s")
+        ]
+    )
+    func validateDurationFieldsUseStableDecimalSeconds(
+        scenario: (duration: Duration, expectedValue: String)
+    ) {
+        let field = OpalDiagnostics.Field(
+            name: "elapsed",
+            value: scenario.duration,
+            privacy: .public
+        )
+
+        #expect(field.value == scenario.expectedValue)
     }
 
     @Test("canonical field helpers make public and private intent explicit")

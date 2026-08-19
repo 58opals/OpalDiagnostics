@@ -2,6 +2,21 @@
 
 Opal Diagnostics is the public Swift package reserved for the Opal stack diagnostics layer.
 
+## Requirements
+
+- Swift tools version: `6.4`
+- Platforms: `macOS 26`, `iOS 26`, `watchOS 26`, `tvOS 26`, `visionOS 26`
+
+## Installation
+
+Use the public `develop` branch for the current Swift 6.4 package stack:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/58opals/OpalDiagnostics.git", branch: "develop")
+]
+```
+
 ## Scope
 
 This package hosts public-safe diagnostics primitives for observability, runtime diagnostic controls, trace correlation, privacy-aware fields, and recent-record export surfaces.

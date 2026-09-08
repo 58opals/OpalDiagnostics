@@ -6,24 +6,11 @@ import OpalDiagnostics
 
 @Suite("OpalDiagnostics public API surface")
 struct OpalDiagnosticsSurfaceValidator {
-    @Test("public facade is available to package clients")
-    func validatePublicFacadeIsAvailableToPackageClients() {
-        _ = OpalDiagnostics.self
-        let logger = OpalDiagnostics.logger(category: .diagnostics)
-        _ = logger.isEnabled(level: .notice)
-        _ = OpalDiagnostics.Event(rawValue: "diagnostics.started")
-        _ = OpalDiagnostics.ErrorCode(rawValue: "diagnostics.failed")
-        _ = OpalDiagnostics.RecordQuery(category: .diagnostics)
-        _ = OpalDiagnostics.RoutingPolicy.disabled
-        _ = OpalDiagnostics.currentTraceID
-
+    @Test("Public category values remain stable")
+    func validatePublicCategoryValuesRemainStable() {
         let categories: [OpalDiagnostics.Category] = [.diagnostics, .network, .persistence, .security, .base, .crypto, .fusion, .hedge, .fulcrum]
 
         #expect(categories.map(\.rawValue) == ["diagnostics", "network", "persistence", "security", "base", "crypto", "fusion", "hedge", "fulcrum"])
-
-        OpalDiagnostics.withConfiguration(.init()) {
-            logger.record(event: "diagnostics.public_facade", level: .notice, fields: { [] })
-        }
     }
 
     @Test("default configuration is public-safe")
@@ -62,6 +49,8 @@ struct OpalDiagnosticsSurfaceValidator {
     func validateLevelThresholdFiltersRoutedRecords() {
         OpalDiagnostics.withConfiguration(.init(minimumLevel: .notice, bufferPolicy: .enabled(capacity: 10))) {
             let logger = OpalDiagnostics.logger(category: .diagnostics)
+            #expect(!logger.isEnabled(level: .debug))
+            #expect(logger.isEnabled(level: .notice))
             logger.record(event: "diagnostics.debug", level: .debug)
             logger.record(event: "diagnostics.notice", level: .notice)
 
@@ -69,45 +58,25 @@ struct OpalDiagnosticsSurfaceValidator {
         }
     }
 
-    @Test("category filters support exact matching")
-    func validateCategoryFiltersSupportExactMatching() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabled([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
-            OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
-            OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
+    @Test(
+        "Category filters preserve exact and dotted boundaries",
+        arguments: [
+            (OpalDiagnostics.CategoryFilter.enabled([.fulcrum]), ["fulcrum"]),
+            (.excluded([.fulcrum]), ["fulcrum.jsonrpc", "fulcrum.websocket", "fulcrum.reconnect", "fulcrumx", "base"]),
+            (.enabledIncludingSubcategories([.fulcrum]), ["fulcrum", "fulcrum.jsonrpc", "fulcrum.websocket", "fulcrum.reconnect"]),
+            (.excludedIncludingSubcategories([.fulcrum]), ["fulcrumx", "base"])
+        ]
+    )
+    func validateCategoryFilterBoundaries(
+        scenario: (filter: OpalDiagnostics.CategoryFilter, expectedCategories: [String])
+    ) {
+        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: scenario.filter, bufferPolicy: .enabled(capacity: 6))) {
+            let categories: [OpalDiagnostics.Category] = [.fulcrum, "fulcrum.jsonrpc", "fulcrum.websocket", "fulcrum.reconnect", "fulcrumx", .base]
+            for category in categories {
+                OpalDiagnostics.logger(category: category).record(event: "diagnostics.category_filtered", level: .debug)
+            }
 
-            #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum"])
-        }
-    }
-
-    @Test("category filters support exact exclusion")
-    func validateCategoryFiltersSupportExactExclusion() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .excluded([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
-            OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
-            OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
-
-            #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum.jsonrpc"])
-        }
-    }
-
-    @Test("category filters include dotted subcategories")
-    func validateCategoryFiltersIncludeDottedSubcategories() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .enabledIncludingSubcategories([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
-            OpalDiagnostics.logger(category: .fulcrum).record(event: "fulcrum.connected", level: .debug)
-            OpalDiagnostics.logger(category: "fulcrum.jsonrpc").record(event: "fulcrum.jsonrpc.sent", level: .debug)
-            OpalDiagnostics.logger(category: "fulcrum.websocket").record(event: "fulcrum.websocket.opened", level: .debug)
-            OpalDiagnostics.logger(category: "fulcrumx").record(event: "fulcrumx.filtered", level: .debug)
-
-            #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == ["fulcrum", "fulcrum.jsonrpc", "fulcrum.websocket"])
-        }
-    }
-
-    @Test("category filters exclude dotted subcategories")
-    func validateCategoryFiltersExcludeDottedSubcategories() {
-        OpalDiagnostics.withConfiguration(.init(minimumLevel: .debug, categoryFilter: .excludedIncludingSubcategories([.fulcrum]), bufferPolicy: .enabled(capacity: 10))) {
-            OpalDiagnostics.logger(category: "fulcrum.reconnect").record(event: "fulcrum.reconnect.started", level: .debug)
-            OpalDiagnostics.logger(category: .base).record(event: "base.loaded", level: .debug)
-
-            #expect(OpalDiagnostics.recentRecords.map(\.category) == [.base])
+            #expect(OpalDiagnostics.recentRecords.map(\.category.rawValue) == scenario.expectedCategories)
         }
     }
 

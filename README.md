@@ -61,6 +61,8 @@ The runtime entry points `configure`, `logger(category:)`, `record(event:level:t
 
 ## Validation
 
+Tests own field privacy, redaction, routing, buffering, filtering, and trace propagation. Parameterize equivalent filtering scenarios while preserving exact and hierarchical boundary cases. Consuming packages retain tests for their own emitted fields and privacy classifications; those integration contracts are separate from this package’s generic routing behavior.
+
 Run the package tests with:
 
 ```sh

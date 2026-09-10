@@ -5,7 +5,7 @@ Opal Diagnostics is the public Swift package reserved for the Opal stack diagnos
 ## Requirements
 
 - Swift tools version: `6.4`
-- Platforms: `macOS 26`, `iOS 26`, `watchOS 26`, `tvOS 26`, `visionOS 26`
+- Platforms: `macOS 27`, `iOS 27`, `watchOS 27`, `tvOS 27`, `visionOS 27`
 
 ## Installation
 
@@ -40,6 +40,8 @@ Out of scope for this package are app-specific UI and Wallet execution notes.
 Host apps own the active routing policy, subsystem, minimum level, category filter, and buffer policy. The default configuration is silent: `routingPolicy` is `.disabled` and `bufferPolicy` is `.disabled`, so record calls do not route to OSLog and do not retain recent records. Enable `.osLog` routing when the app wants platform logging, enable buffering only when the app wants recent-record export with private field values redacted, or enable both when both destinations are needed.
 
 Exact category filters preserve exact matching with `.enabled(_:)` and `.excluded(_:)`. Use `.enabledIncludingSubcategories(_:)` or `.excludedIncludingSubcategories(_:)` when a root category such as `fulcrum` should also match dotted subcategories such as `fulcrum.jsonrpc`, `fulcrum.websocket`, and `fulcrum.reconnect`.
+
+Async `withConfiguration` and `withTraceID` operations preserve the caller's actor isolation, including across suspension, and can capture and return actor-confined non-Sendable values. Scoped values propagate to child tasks and restore their parent values when the operation returns or throws, including cancellation errors. The scopes do not move work to a background executor or suppress cancellation.
 
 ## Diagnostic Privacy
 

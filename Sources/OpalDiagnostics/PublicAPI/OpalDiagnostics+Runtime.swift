@@ -29,10 +29,10 @@ public extension OpalDiagnostics {
         try OpalDiagnosticsRuntime.shared.withConfiguration(configuration, operation: operation)
     }
 
-    /// Runs an async operation with diagnostics settings scoped to the current task and inherited child tasks.
-    static func withConfiguration<Success>(
+    /// Runs an async operation on the caller's actor with diagnostics settings scoped to this task and inherited child tasks.
+    static nonisolated(nonsending) func withConfiguration<Success>(
         _ configuration: Configuration,
-        operation: () async throws -> Success
+        operation: nonisolated(nonsending) () async throws -> Success
     ) async rethrows -> Success {
         try await OpalDiagnosticsRuntime.shared.withConfiguration(configuration, operation: operation)
     }

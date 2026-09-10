@@ -14,10 +14,10 @@ public extension OpalDiagnostics {
         try OpalDiagnosticsRuntime.shared.withTraceID(traceID, operation: operation)
     }
 
-    /// Runs an async operation with a trace ID scoped to the current task and inherited child tasks.
-    static func withTraceID<Success>(
+    /// Runs an async operation on the caller's actor with a trace ID scoped to this task and inherited child tasks.
+    static nonisolated(nonsending) func withTraceID<Success>(
         _ traceID: TraceID?,
-        operation: () async throws -> Success
+        operation: nonisolated(nonsending) () async throws -> Success
     ) async rethrows -> Success {
         try await OpalDiagnosticsRuntime.shared.withTraceID(traceID, operation: operation)
     }

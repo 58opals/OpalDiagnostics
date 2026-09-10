@@ -51,14 +51,12 @@ final class OpalDiagnosticsRuntime: Sendable {
         }
     }
 
-    func withConfiguration<Success>(
+    nonisolated(nonsending) func withConfiguration<Success>(
         _ configuration: OpalDiagnostics.Configuration,
-        operation: () async throws -> Success
+        operation: nonisolated(nonsending) () async throws -> Success
     ) async rethrows -> Success {
         let context = DiagnosticsRuntimeContext(configuration: configuration)
-        return try await Self.$scopedContext.withValue(context) {
-            try await operation()
-        }
+        return try await Self.$scopedContext.withValue(context, operation: operation)
     }
 
     func withRecordRouter<Success>(
@@ -70,13 +68,11 @@ final class OpalDiagnosticsRuntime: Sendable {
         }
     }
 
-    func withRecordRouter<Success>(
+    nonisolated(nonsending) func withRecordRouter<Success>(
         _ router: any DiagnosticRecordRouting,
-        operation: () async throws -> Success
+        operation: nonisolated(nonsending) () async throws -> Success
     ) async rethrows -> Success {
-        try await Self.$scopedRecordRouter.withValue(router) {
-            try await operation()
-        }
+        try await Self.$scopedRecordRouter.withValue(router, operation: operation)
     }
 
     func withTraceID<Success>(
@@ -88,13 +84,11 @@ final class OpalDiagnosticsRuntime: Sendable {
         }
     }
 
-    func withTraceID<Success>(
+    nonisolated(nonsending) func withTraceID<Success>(
         _ traceID: OpalDiagnostics.TraceID?,
-        operation: () async throws -> Success
+        operation: nonisolated(nonsending) () async throws -> Success
     ) async rethrows -> Success {
-        try await Self.$scopedTraceID.withValue(traceID) {
-            try await operation()
-        }
+        try await Self.$scopedTraceID.withValue(traceID, operation: operation)
     }
 
     func record(

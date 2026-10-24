@@ -7,6 +7,8 @@ Opal Diagnostics is the public Swift package reserved for the Opal stack diagnos
 - Swift tools version: `6.4`
 - Platforms: `macOS 27`, `iOS 27`, `watchOS 27`, `tvOS 27`, `visionOS 27`
 
+Use the Xcode 27 family with a compiler supporting Swift tools 6.4 and Swift 6 language mode. The supported platform versions above are 27.0 deployment minimums; a newer selected 27.x SDK does not raise them. Before validation, record the active developer-directory selection and overrides, Xcode build, effective Swift compiler and each selected SDK version/path. After any of these inputs changes, use a new external scratch or derived-data lane and rerun the affected builds and tests. Preserve earlier receipts, any consumer dependency lock and normal signing/security settings; an IDE update does not renew earlier validation. This package does not require Metal; consumers that add it must record that component separately.
+
 ## Installation
 
 Use the public `develop` branch for the current Swift 6.4 package stack:

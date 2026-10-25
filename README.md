@@ -67,8 +67,13 @@ The runtime entry points `configure`, `logger(category:)`, `record(event:level:t
 
 Tests own field privacy, redaction, routing, buffering, filtering, and trace propagation. Parameterize equivalent filtering scenarios while preserving exact and hierarchical boundary cases. Consuming packages retain tests for their own emitted fields and privacy classifications; those integration contracts are separate from this package’s generic routing behavior.
 
-Run the package tests with:
+The normal development command builds/discovers once and runs the entire inexpensive package suite from that build. All current definitions protect privacy, routing and concurrency contracts, so development and assurance intentionally retain the same selection.
 
 ```sh
-swift test
+sh scripts/validate.sh
+sh scripts/validate.sh focused OpalDiagnosticsConcurrencyValidator
+sh scripts/validate.sh --list assurance
+sh scripts/validate.sh assurance
 ```
+
+`focused` accepts a literal substring of a discovered suite or test identifier, including a complete identifier. Empty, malformed and unmatched selections fail. Successful discovery alone is insufficient: execution must produce a native result containing non-skipped tests. `--list` prints the exact selected identifiers without execution after discovery. No tests or assertions are removed. Set `OPAL_VALIDATION_SCRATCH_PATH` to a per-repository, toolchain-compatible cache when needed; the default is `.build/validation`. The runner uses `--skip-build` only immediately after building/discovering in the same invocation and does not trust a persistent freshness stamp. Raw `swift test` remains supported.

@@ -11,13 +11,15 @@ Use the Xcode 27 family with a compiler supporting Swift tools 6.4 and Swift 6 l
 
 ## Installation
 
-Use the public `develop` branch for the current Swift 6.4 package stack:
+For reproducible integration of the current Swift 6.4 / OS 27 stack, pin a reviewed public `develop` commit. Replace the placeholder below with its full 40-character commit hash before resolving:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/58opals/OpalDiagnostics.git", branch: "develop")
+    .package(url: "https://github.com/58opals/OpalDiagnostics.git", revision: "<reviewed-public-develop-commit>")
 ]
 ```
+
+When consuming other Opal packages, reuse the exact Diagnostics revision declared in their `Package.swift` files so the application resolves one compatible graph. Standalone consumers select and validate a public revision against their own requirements. Retain the consuming application's `Package.resolved` to record the complete graph; a reviewed integration commit is not a SemVer release.
 
 ## Scope
 
